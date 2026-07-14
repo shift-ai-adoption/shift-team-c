@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>RAG環境</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body{background:#0f172a;color:#e2e8f0;font-family:sans-serif}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:.75rem;padding:1.5rem}
+    .btn{border-radius:.5rem;padding:.5rem 1.25rem;cursor:pointer;font-weight:600;transition:opacity .2s}
+    .btn:hover{opacity:.85}
+    .btn-blue{background:#3b82f6;color:#fff}
+    .btn-green{background:#22c55e;color:#fff}
+    .btn-purple{background:#a855f7;color:#fff}
+    .inp{background:#0f172a;border:1px solid #475569;border-radius:.5rem;padding:.5rem .75rem;width:100%;color:#e2e8f0}
+    .inp:focus{outline:none;border-color:#3b82f6}
+    .tab{padding:.5rem 1rem;cursor:pointer;border-bottom:2px solid transparent;color:#94a3b8}
+    .tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+    .chunk{background:#0f172a;border-left:3px solid #3b82f6;padding:.75rem;margin:.5rem 0;border-radius:0 .5rem .5rem 0}
+    .badge{display:inline-block;padding:.15rem .5rem;border-radius:9999px;font-size:.75rem}
+    pre{white-space:pre-wrap;word-break:break-word}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const API = "";  // same origin via nginx
+
+function useApi(path, opts) {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const run = React.useCallback(async (body, extraOpts) => {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(API + path, { ...opts, ...extraOpts, body });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      setData(await res.json());
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, [path]);
+  return { data, loading, error, run };
+}
+
+// ---- Documents tab ----
+function Documents() {
+  const [docs, setDocs] = React.useState([]);
+  const [msg, setMsg] = React.useState("");
+  const fileRef = React.useRef();
+  const [versionLabel, setVersionLabel] = React.useState("");
+
+  const load = async () => {
+    const r = await fetch(API + "/api/documents"); setDocs(await r.json());
+  };
+  React.useEffect(() => { load(); }, []);
+
+  const upload = async () => {
+    const file = fileRef.current.files[0];
+    if (!file) return setMsg("ファイルを選択してください");
+    const fd = new FormData(); fd.append("file", file);
+    const url = "/api/upload" + (versionLabel ? `?version_label=${encodeURIComponent(versionLabel)}` : "");
+    const r = await fetch(url, { method: "POST", body: fd });
+    const j = await r.json();
+    if (!r.ok) return setMsg("エラー: " + JSON.stringify(j));
+    setMsg("アップロード完了: " + j.document_id);
+    setVersionLabel(""); fileRef.current.value = "";
+    load();
+  };
+
+  const vectorize = async (id) => {
+    setMsg("ベクトル化中...");
+    const r = await fetch(`/api/vectorize/${id}`, { method: "POST", headers: {"Content-Type":"application/json"}, body: "{}" });
+    const j = await r.json();
+    setMsg("ベクトル化開始: " + j.status);
+    setTimeout(load, 3000);
+  };
+
+  const statusColor = s => ({ uploaded:"#94a3b8", processing:"#f59e0b", vectorized:"#22c55e", error:"#ef4444" }[s] || "#94a3b8");
+
+  return (
+    <div>
+      <div className="card mb-4">
+        <h2 className="text-lg font-bold mb-3">📄 ドキュメントアップロード</h2>
+        <div className="flex gap-2 mb-2 flex-wrap">
+          <input ref={fileRef} type="file" accept=".pdf,.txt,.md,.csv,.docx,.xlsx" className="inp flex-1"/>
+          <input value={versionLabel} onChange={e=>setVersionLabel(e.target.value)}
+            placeholder="バージョンラベル（省略可）" className="inp" style={{width:"200px"}}/>
+          <button className="btn btn-blue" onClick={upload}>アップロード</button>
+        </div>
+        {msg && <p className="text-sm mt-1" style={{color: msg.startsWith("エラー")?"#ef4444":"#22c55e"}}>{msg}</p>}
+      </div>
+
+      <div className="card">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-bold">📚 ドキュメント一覧</h2>
+          <button className="btn btn-green" style={{padding:".25rem .75rem",fontSize:".85rem"}} onClick={load}>更新</button>
+        </div>
+        {docs.length === 0 ? <p className="text-slate-400">ドキュメントなし</p> :
+          <div className="overflow-x-auto">
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:".9rem"}}>
+              <thead><tr style={{borderBottom:"1px solid #334155"}}>
+                {["ファイル名","バージョン","状態","チャンク数","登録日","操作"].map(h=>(
+                  <th key={h} style={{padding:".5rem .75rem",textAlign:"left",color:"#94a3b8"}}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {docs.map(d => (
+                  <tr key={d.id} style={{borderBottom:"1px solid #1e293b"}}>
+                    <td style={{padding:".5rem .75rem"}}>{d.filename}</td>
+                    <td style={{padding:".5rem .75rem",color:"#a78bfa"}}>{d.version_label}</td>
+                    <td style={{padding:".5rem .75rem"}}>
+                      <span className="badge" style={{background: statusColor(d.status)+"33", color: statusColor(d.status)}}>
+                        {d.status}
+                      </span>
+                    </td>
+                    <td style={{padding:".5rem .75rem",textAlign:"center"}}>{d.chunk_count}</td>
+                    <td style={{padding:".5rem .75rem",fontSize:".8rem",color:"#94a3b8"}}>{d.created_at.slice(0,16)}</td>
+                    <td style={{padding:".5rem .75rem"}}>
+                      {d.status === "uploaded" &&
+                        <button className="btn btn-purple" style={{padding:".2rem .6rem",fontSize:".8rem"}}
+                          onClick={()=>vectorize(d.id)}>ベクトル化</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ---- Search tab ----
+function Search() {
+  const [query, setQuery] = React.useState("");
+  const [result, setResult] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState(null);
+
+  const search = async () => {
+    if (!query.trim()) return;
+    setLoading(true); setError(null);
+    try {
+      const r = await fetch("/api/search", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ query, top_k: 5 })
+      });
+      if (!r.ok) throw new Error(await r.text());
+      setResult(await r.json());
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div>
+      <div className="card mb-4">
+        <h2 className="text-lg font-bold mb-3">🔍 RAG検索</h2>
+        <div className="flex gap-2">
+          <input value={query} onChange={e=>setQuery(e.target.value)}
+            onKeyDown={e=>e.key==="Enter"&&search()}
+            placeholder="質問を入力してEnter" className="inp flex-1"/>
+          <button className="btn btn-blue" onClick={search} disabled={loading}>
+            {loading ? "検索中..." : "検索"}
+          </button>
+        </div>
+        {error && <p style={{color:"#ef4444",marginTop:".5rem"}}>{error}</p>}
+      </div>
+
+      {result && (
+        <div>
+          <div className="card mb-4">
+            <h3 className="font-bold mb-2" style={{color:"#22c55e"}}>💬 回答</h3>
+            <pre style={{lineHeight:1.7}}>{result.answer}</pre>
+          </div>
+          <div className="card">
+            <h3 className="font-bold mb-2" style={{color:"#3b82f6"}}>📎 根拠チャンク ({result.chunks.length}件)</h3>
+            {result.chunks.map((c,i) => (
+              <div key={i} className="chunk">
+                <div className="flex justify-between mb-1" style={{fontSize:".8rem",color:"#94a3b8"}}>
+                  <span>{c.filename} · chunk {c.chunk_index}</span>
+                  <span style={{color:"#22c55e"}}>スコア: {c.score.toFixed(3)}</span>
+                </div>
+                <p style={{fontSize:".9rem"}}>{c.content.slice(0,300)}{c.content.length>300?"...":""}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Compare tab ----
+function Compare() {
+  const [docs, setDocs] = React.useState([]);
+  const [query, setQuery] = React.useState("");
+  const [selected, setSelected] = React.useState([]);
+  const [result, setResult] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch("/api/documents").then(r=>r.json()).then(d=>setDocs(d.filter(x=>x.status==="vectorized")));
+  }, []);
+
+  const toggle = id => setSelected(s => s.includes(id) ? s.filter(x=>x!==id) : [...s, id]);
+
+  const compare = async () => {
+    if (!query.trim() || selected.length < 1) return;
+    setLoading(true);
+    try {
+      const r = await fetch("/api/compare", {
+        method: "POST", headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ query, version_ids: selected })
+      });
+      setResult(await r.json());
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div>
+      <div className="card mb-4">
+        <h2 className="text-lg font-bold mb-3">🔀 バージョン比較</h2>
+        <input value={query} onChange={e=>setQuery(e.target.value)}
+          placeholder="比較したい質問" className="inp mb-3"/>
+        <p className="text-sm mb-2" style={{color:"#94a3b8"}}>比較するドキュメントを選択（複数可）:</p>
+        <div className="flex flex-wrap gap-2 mb-3">
+          {docs.map(d => (
+            <button key={d.id} onClick={()=>toggle(d.id)} className="btn"
+              style={{background: selected.includes(d.id)?"#6366f1":"#334155", color:"#fff", fontSize:".85rem"}}>
+              {d.version_label || d.filename}
+            </button>
+          ))}
+          {docs.length === 0 && <p style={{color:"#94a3b8"}}>ベクトル化済みドキュメントがありません</p>}
+        </div>
+        <button className="btn btn-blue" onClick={compare} disabled={loading || selected.length<1}>
+          {loading ? "比較中..." : "比較実行"}
+        </button>
+      </div>
+
+      {result && (
+        <div className="grid gap-4" style={{gridTemplateColumns: `repeat(${result.results.length},1fr)`}}>
+          {result.results.map((r,i) => {
+            const doc = docs.find(d=>d.id===r.document_id);
+            return (
+              <div key={i} className="card">
+                <h3 className="font-bold mb-2" style={{color:"#a78bfa",fontSize:".95rem"}}>
+                  {doc ? (doc.version_label || doc.filename) : r.document_id.slice(0,8)}
+                </h3>
+                <pre style={{fontSize:".85rem",lineHeight:1.6}}>{r.answer}</pre>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- Stats tab ----
+function Stats() {
+  const [kws, setKws] = React.useState([]);
+  React.useEffect(() => {
+    fetch("/api/stats/keywords?top=20").then(r=>r.json()).then(setKws);
+  }, []);
+  const max = kws.length ? kws[0].count : 1;
+  return (
+    <div className="card">
+      <h2 className="text-lg font-bold mb-4">📊 検索キーワードランキング</h2>
+      {kws.length === 0 ? <p style={{color:"#94a3b8"}}>まだ検索履歴がありません</p> :
+        kws.map((k,i) => (
+          <div key={i} className="mb-2">
+            <div className="flex justify-between text-sm mb-1">
+              <span>{i+1}. {k.keyword}</span>
+              <span style={{color:"#22c55e"}}>{k.count}回</span>
+            </div>
+            <div style={{background:"#0f172a",borderRadius:"9999px",height:"6px"}}>
+              <div style={{background:"#3b82f6",borderRadius:"9999px",height:"6px",width:`${k.count/max*100}%`}}/>
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  );
+}
+
+// ---- App ----
+const TABS = [
+  {id:"docs",   label:"📄 ドキュメント", Component: Documents},
+  {id:"search", label:"🔍 検索",         Component: Search},
+  {id:"compare",label:"🔀 バージョン比較",Component: Compare},
+  {id:"stats",  label:"📊 統計",         Component: Stats},
+];
+
+function App() {
+  const [tab, setTab] = React.useState("docs");
+  const Active = TABS.find(t=>t.id===tab).Component;
+  return (
+    <div style={{maxWidth:"1100px",margin:"0 auto",padding:"1.5rem"}}>
+      <h1 className="text-2xl font-bold mb-1" style={{color:"#38bdf8"}}>🤖 RAG環境 (shift-team-c)</h1>
+      <p className="text-sm mb-4" style={{color:"#94a3b8"}}>AWS Bedrock × pgvector × React</p>
+      <div className="flex gap-0 border-b mb-5" style={{borderColor:"#334155"}}>
+        {TABS.map(t => (
+          <button key={t.id} className={"tab" + (tab===t.id?" active":"")} onClick={()=>setTab(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <Active/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
