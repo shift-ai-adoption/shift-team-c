@@ -1,0 +1,28 @@
+# onprem_log_training — client (アプリケーションサーバ層) コンテナ
+# RoboMart の UI/API を提供する。SSHは搭載しない(学習上、clientログはホストから
+# 直接読める設計を維持するため — 収集練習の対象はserver側のみ)。
+FROM docker.io/library/node:18-alpine
+
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG NO_PROXY
+
+WORKDIR /app
+
+COPY client/package.json ./
+RUN npm install --omit=dev
+
+COPY client/ ./
+
+RUN mkdir -p /app/logs && chown -R node:node /app
+
+ENV NODE_ENV=production \
+    PORT=3002
+
+EXPOSE 3002
+
+USER node
+
+CMD ["node", "server.js"]
+
+LABEL description="onprem_log_training - client tier (application server, no SSH, logs bind-mounted from host)"

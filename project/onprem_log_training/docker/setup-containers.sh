@@ -1,5 +1,5 @@
 #!/bin/bash
-# onprem_log_training — server コンテナのライフサイクル管理
+# onprem_log_training — client + server コンテナのライフサイクル管理
 
 set -e
 
@@ -37,6 +37,8 @@ case "$1" in
     $COMPOSE_CMD down --volumes --remove-orphans 2>/dev/null || true
     docker rm -f onprem-log-training-server 2>/dev/null || true
     docker rmi onprem-log-training-server:latest 2>/dev/null || true
+    docker rm -f onprem-log-training-client 2>/dev/null || true
+    docker rmi onprem-log-training-client:latest 2>/dev/null || true
     echo "🏗️  Building image..."
     $COMPOSE_CMD build --no-cache
     echo "🚀 Starting container..."
@@ -57,6 +59,7 @@ case "$1" in
     echo "🧹 Removing container, image, network..."
     $COMPOSE_CMD down --volumes --remove-orphans 2>/dev/null || true
     docker rmi onprem-log-training-server:latest 2>/dev/null || true
+    docker rmi onprem-log-training-client:latest 2>/dev/null || true
     ;;
   *)
     echo "Usage: $0 {rebuild|start|stop|status|clean}"

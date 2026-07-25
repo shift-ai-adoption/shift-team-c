@@ -1,7 +1,48 @@
-# onprem_log_training — server (機能/業務ロジック層) の単一コンテナ構成
-# client/ はプレーンな node プロセスとしてホスト側で動かす想定のため、ここには含めない。
+# onprem_log_training — client (アプリケーション層) + server (機能/業務ロジック層) の
+# 2コンテナ構成。`docker compose up -d --build` で両方が同時に起動する。
+#
+# 非対称設計(意図的):
+# - training-client: SSH非搭載。ログ (client/logs/app.log) はホストへbind mountし、
+#   学習者がSSH無しで直接読める状態を維持する。
+# - training-server: SSH搭載。ログ (/app/logs/service.log) はコンテナ内のみに置き、
+#   学習者がSSH経由でのみ収集できるようにする(収集練習の対象、bind mountしない)。
 
 services:
+  training-client:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.client
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
+    image: ${CLIENT_DOCKER_IMAGE:-onprem-log-training-client:latest}
+    container_name: onprem-log-training-client
+    hostname: training-client
+    ports:
+      - "${CLIENT_HTTP_PORT:-3002}:3002"
+    environment:
+      - PORT=3002
+      # compose内ではサービス名で解決する。ローカル(Dockerなし)クイックスタート用の
+      # .env の SERVER_BASE_URL=http://localhost:4002 とは別経路なので、ここで明示的に上書きする。
+      - SERVER_BASE_URL=http://training-server:4002
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - NO_PROXY=${NO_PROXY:-}
+    volumes:
+      - ../client/logs:/app/logs
+    depends_on:
+      training-server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - onprem-log-training-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   training-server:
     build:
       context: ..

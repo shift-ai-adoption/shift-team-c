@@ -18,7 +18,40 @@
   両方のログに同一TrackIDが残るようにしています。これにより「別サーバーのログをTrackIDで
   紐づけて収集する」という研修テーマを体験できます。
 
+## クイックスタート(Docker、推奨)
+
+`client` と `server` を1つの docker-compose で同時に起動します。
+
+```bash
+cp .env.example .env
+cd docker
+./setup-containers.sh start
+# または: cd docker && docker compose up -d --build
+```
+
+ブラウザで `http://localhost:3002/` を開きます(ポートは `.env` の `CLIENT_HTTP_PORT` で変更可)。
+
+- 在庫切れ商品「WalkyDog Mk2」の詳細ページを開く → 500エラー(`PRODUCT_STOCK_ZERO_NPE`)
+- カートに商品を追加し、決済方法「請求書払い」で注文確定 → 500エラー(`ORDER_TOTAL_UNDEFINED_TAX`)
+
+いずれのエラーもレスポンスに `track_id` が含まれ、`client/logs/app.log`(ホストへbind mount済み、
+SSH不要で直接読めます)と `server/logs/service.log`(コンテナ内、SSH経由でアクセス)の両方に
+同じTrackIDでログが残ります。`server` へのSSH接続情報は [AGENT_SSH_GUIDE.md](AGENT_SSH_GUIDE.md)
+にまとめています。学習者はこのファイルをAIエージェントに読ませるだけで、SSH接続の詳細を
+意識せずに使えます。
+
+バグは `server/bug-config.json` の `enabled` を `false` にすると個別に無効化できます。
+
+コンテナの停止/削除:
+
+```bash
+./setup-containers.sh stop
+./setup-containers.sh clean
+```
+
 ## クイックスタート(ローカル、Dockerなし)
+
+Dockerを使わずに動作確認したい場合は、次の手順でも起動できます。
 
 ```bash
 # server (機能サーバ) を起動
@@ -32,34 +65,7 @@ npm install
 PORT=3002 SERVER_BASE_URL=http://localhost:4002 node server.js
 ```
 
-ブラウザで `http://localhost:3002/` を開きます。
-
-- 在庫切れ商品「WalkyDog Mk2」の詳細ページを開く → 500エラー(`PRODUCT_STOCK_ZERO_NPE`)
-- カートに商品を追加し、決済方法「請求書払い」で注文確定 → 500エラー(`ORDER_TOTAL_UNDEFINED_TAX`)
-
-いずれのエラーもレスポンスに `track_id` が含まれ、`client/logs/app.log` と
-`server/logs/service.log` の両方に同じTrackIDでログが残ります。
-
-バグは `server/bug-config.json` の `enabled` を `false` にすると個別に無効化できます。
-
-## server をDocker/SSHで動かす(収集練習用)
-
-```bash
-cp .env.example .env
-cd docker
-./setup-containers.sh start
-```
-
-これで `server` がコンテナとして起動し、SSH(既定ポート `5101`)でログにアクセスできます。
-学習者のAIエージェント向けの接続情報は [AGENT_SSH_GUIDE.md](AGENT_SSH_GUIDE.md) にまとめています。
-学習者はこのファイルをAIエージェントに読ませるだけで、SSH接続の詳細を意識せずに使えます。
-
-コンテナの停止/削除:
-
-```bash
-./setup-containers.sh stop
-./setup-containers.sh clean
-```
+ブラウザで `http://localhost:3002/` を開きます。挙動は上記Docker版と同じです。
 
 ## プロキシ切替(オンプレ環境向け)
 
