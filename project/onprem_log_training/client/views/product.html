@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>商品詳細 — RoboMart</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1><a href="/">RoboMart</a></h1>
+    <nav><a href="/cart">カート</a></nav>
+  </header>
+  <main id="detail"></main>
+  <script>
+    const sku = location.pathname.split('/').pop();
+    fetch('/api/robots/' + sku).then(async r => {
+      const detail = document.getElementById('detail');
+      if (!r.ok) {
+        detail.innerHTML = `<p class="error">エラー: ${r.status} 商品を取得できません</p>`;
+        return;
+      }
+      const p = await r.json();
+      detail.innerHTML = `
+        <h2>${p.name}</h2>
+        <p class="price">¥${p.price.toLocaleString()}</p>
+        <p class="stock">在庫: ${p.stock}</p>
+        <p>${p.description || ''}</p>
+        <button id="add">カートに追加</button>
+        <h3>関連商品</h3>
+        <ul>${(p.related_products || []).map(r => `<li><a href="/product/${r.sku}">${r.name}</a></li>`).join('')}</ul>
+      `;
+      document.getElementById('add').onclick = () => {
+        fetch('/api/cart/items', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ sku, qty: 1 })
+        }).then(() => location.href = '/cart');
+      };
+    });
+  </script>
+</body>
+</html>

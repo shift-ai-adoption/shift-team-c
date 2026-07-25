@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>カート — RoboMart</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1><a href="/">RoboMart</a></h1>
+    <nav><a href="/cart">カート</a></nav>
+  </header>
+  <main>
+    <h2>カート</h2>
+    <ul id="cart"></ul>
+    <form id="order" onsubmit="return submitOrder(event)">
+      <label>お届け先: <input name="shipping_address" value="東京都千代田区1-1-1" required></label>
+      <label>決済方法:
+        <select name="payment_method">
+          <option value="credit_card">クレジットカード</option>
+          <option value="bank_transfer">銀行振込</option>
+          <option value="invoice">請求書払い (法人向け)</option>
+        </select>
+      </label>
+      <button type="submit">注文確定</button>
+    </form>
+    <pre id="result"></pre>
+  </main>
+  <script>
+    function render(items) {
+      document.getElementById('cart').innerHTML = items.length
+        ? items.map(i => `<li>${i.sku} × ${i.qty}</li>`).join('')
+        : '<li>カートは空です</li>';
+    }
+    fetch('/api/cart').then(r => r.json()).then(c => render(c.items));
+
+    function submitOrder(e) {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      fetch('/api/orders', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(Object.fromEntries(fd))
+      }).then(async r => {
+        const out = document.getElementById('result');
+        if (!r.ok) {
+          out.textContent = `エラー: ${r.status}\n` + await r.text();
+        } else {
+          out.textContent = '注文完了:\n' + JSON.stringify(await r.json(), null, 2);
+        }
+      });
+      return false;
+    }
+  </script>
+</body>
+</html>

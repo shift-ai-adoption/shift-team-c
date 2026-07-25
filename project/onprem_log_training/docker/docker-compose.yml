@@ -1,0 +1,41 @@
+# onprem_log_training — server (機能/業務ロジック層) の単一コンテナ構成
+# client/ はプレーンな node プロセスとしてホスト側で動かす想定のため、ここには含めない。
+
+services:
+  training-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-}
+    # ローカルビルド時のタグ。オンプレでpull運用する場合は .env の DOCKER_IMAGE を
+    # docker.io/<user>/<repo>:<tag> のフルパスで指定すること。
+    image: ${DOCKER_IMAGE:-onprem-log-training-server:latest}
+    container_name: onprem-log-training-server
+    hostname: training-server
+    ports:
+      - "${SSH_PORT:-5101}:22"
+      - "${SERVER_HTTP_PORT:-4002}:4002"
+    # コンテナ実行時 (node server.js プロセス) が外部通信を行う場合に備えたプロキシ設定。
+    # USE_PROXY=false の場合は空文字列になり、プロキシなしで動作する。
+    environment:
+      - HTTP_PROXY=${HTTP_PROXY:-}
+      - HTTPS_PROXY=${HTTPS_PROXY:-}
+      - NO_PROXY=${NO_PROXY:-}
+    restart: unless-stopped
+    networks:
+      - onprem-log-training-network
+    healthcheck:
+      test: ["CMD", "pgrep", "sshd"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  onprem-log-training-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16

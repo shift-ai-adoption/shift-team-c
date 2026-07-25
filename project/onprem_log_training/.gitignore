@@ -1,0 +1,15 @@
+node_modules/
+logs/
+package-lock.json
+.env
+
+# 親 .gitignore の *.json / data/ / lib/ 除外を打ち消し、このプロジェクトの必須ファイルを追跡する
+!package.json
+!*/package.json
+!server/data/
+!server/data/robots.json
+!server/bug-config.json
+!*/src/lib/
+!*/src/lib/*.js
+
+# 学習用のSSH鍵は意図的に平文コミットする(セキュリティ考慮不要な前提のため .gitignore しない)

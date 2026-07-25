@@ -1,0 +1,12 @@
+{
+  "name": "onprem-log-training-server",
+  "version": "0.1.0",
+  "description": "研修用オンプレ環境 — 機能(業務ロジック)サーバ役",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

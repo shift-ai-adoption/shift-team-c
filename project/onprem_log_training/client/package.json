@@ -1,0 +1,13 @@
+{
+  "name": "onprem-log-training-client",
+  "version": "0.1.0",
+  "description": "研修用オンプレ環境 — アプリケーションサーバ役 (RoboMart)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2"
+  }
+}

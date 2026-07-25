@@ -1,0 +1,18 @@
+{
+  "bugs": {
+    "PRODUCT_STOCK_ZERO_NPE": {
+      "enabled": true,
+      "description": "GET /internal/inventory/:sku で stock=0 の商品を見ると related_products を undefined で map しようとして TypeError",
+      "affects": "server/src/routes/inventory.js#getBySku",
+      "trigger": "SKU RBT-DOG-02 (stock=0) の詳細ページを開く",
+      "user_impact": "在庫切れ商品ページが 500 になり離脱率上昇"
+    },
+    "ORDER_TOTAL_UNDEFINED_TAX": {
+      "enabled": true,
+      "description": "POST /internal/billing/calc で payment_method='invoice' のとき tax_rate が未定義になり total.toFixed() で TypeError",
+      "affects": "server/src/routes/billing.js#calcTotal",
+      "trigger": "決済方法「請求書払い」で注文確定",
+      "user_impact": "法人向け請求書決済が全滅、機会損失甚大"
+    }
+  }
+}

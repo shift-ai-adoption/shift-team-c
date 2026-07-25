@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>RoboMart</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1><a href="/">RoboMart</a></h1>
+    <nav><a href="/cart">カート</a></nav>
+  </header>
+  <main>
+    <h2>ロボット一覧</h2>
+    <ul id="list" class="products"></ul>
+  </main>
+  <script>
+    fetch('/api/robots').then(r => r.json()).then(items => {
+      const ul = document.getElementById('list');
+      for (const it of items) {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <a href="/product/${it.sku}">${it.name}</a>
+          <span class="price">¥${it.price.toLocaleString()}</span>
+          <span class="stock ${it.stock === 0 ? 'out' : ''}">${it.stock === 0 ? '在庫切れ' : '在庫' + it.stock}</span>
+        `;
+        ul.appendChild(li);
+      }
+    });
+  </script>
+</body>
+</html>

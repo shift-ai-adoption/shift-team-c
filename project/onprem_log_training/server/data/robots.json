@@ -1,0 +1,38 @@
+[
+  {
+    "sku": "RBT-ARM-01",
+    "name": "AssemblyArm α",
+    "price": 198000,
+    "stock": 5,
+    "category": "industrial",
+    "description": "6軸多関節の産業用組立アーム。可搬重量5kg、リーチ850mm。",
+    "related": ["RBT-HUM-04"]
+  },
+  {
+    "sku": "RBT-DOG-02",
+    "name": "WalkyDog Mk2",
+    "price": 89800,
+    "stock": 0,
+    "category": "companion",
+    "description": "4脚歩行のコンパニオンロボット。段差20mmまで踏破可能。",
+    "related": ["RBT-CAT-03"]
+  },
+  {
+    "sku": "RBT-CAT-03",
+    "name": "MeowBot ν",
+    "price": 54800,
+    "stock": 12,
+    "category": "companion",
+    "description": "膝上サイズのネコ型セラピーロボット。ゴロゴロ音付き。",
+    "related": ["RBT-DOG-02"]
+  },
+  {
+    "sku": "RBT-HUM-04",
+    "name": "HumanoidX",
+    "price": 1280000,
+    "stock": 1,
+    "category": "humanoid",
+    "description": "全長150cmの汎用ヒューマノイド。ROS2対応。",
+    "related": ["RBT-ARM-01"]
+  }
+]
