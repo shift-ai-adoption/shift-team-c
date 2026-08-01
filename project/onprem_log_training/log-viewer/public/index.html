@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log Viewer Dashboard — onprem_log_training</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>🪵 Log Viewer Dashboard</h1>
+    <div class="controls">
+      <label class="check-label">
+        <input type="checkbox" id="errorsOnly" checked />
+        ERRORのみ表示
+      </label>
+      <button id="refreshBtn">🔄 更新</button>
+      <span id="lastUpdated" class="last-updated"></span>
+    </div>
+  </header>
+
+  <!-- ① サマリーカード -->
+  <section id="summaryCards" class="card-grid">
+    <div class="card">
+      <div class="card-val" id="valTotal">—</div>
+      <div class="card-label">総リクエスト</div>
+    </div>
+    <div class="card card-error">
+      <div class="card-val" id="valError">—</div>
+      <div class="card-label">ERROR件数</div>
+    </div>
+    <div class="card">
+      <div class="card-val" id="valRate">—</div>
+      <div class="card-label">エラー率</div>
+    </div>
+    <div class="card card-time">
+      <div class="card-val card-val-sm" id="valStart">—</div>
+      <div class="card-label">開始時刻</div>
+    </div>
+    <div class="card card-time">
+      <div class="card-val card-val-sm" id="valEnd">—</div>
+      <div class="card-label">終了時刻</div>
+    </div>
+    <div class="card">
+      <div class="card-val" id="valDuration">—</div>
+      <div class="card-label">観測時間（分）</div>
+    </div>
+    <div class="card">
+      <div class="card-val" id="valSSH">—</div>
+      <div class="card-label">Server SSH</div>
+    </div>
+  </section>
+
+  <!-- ② ランキング + 重複集計 -->
+  <section class="ranking-area">
+    <div class="ranking-block">
+      <h2>🔥 エラーパス ランキング Top10</h2>
+      <ol id="pathRanking" class="ranking-list"></ol>
+    </div>
+    <div class="ranking-block">
+      <h2>📋 エラーメッセージ ランキング Top10</h2>
+      <ol id="msgRanking" class="ranking-list"></ol>
+    </div>
+    <div class="ranking-block ranking-block-wide">
+      <h2>🔁 重複ログ集計</h2>
+      <table class="dup-table">
+        <thead>
+          <tr>
+            <th>パターン (level|path)</th>
+            <th>件数</th>
+            <th>TrackIDs</th>
+          </tr>
+        </thead>
+        <tbody id="dupBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ③ インシデント一覧 -->
+  <section id="incidentSection">
+    <h2>📊 インシデント一覧</h2>
+    <table class="incident-table">
+      <thead>
+        <tr>
+          <th>TrackID</th>
+          <th>レベル</th>
+          <th>タイムスタンプ</th>
+          <th>パス</th>
+          <th>Client</th>
+          <th>Server</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="6" class="loading">読み込み中...</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ④ 詳細パネル（行クリックで表示） -->
+  <section id="detailPanel" class="hidden">
+    <div class="panel-header">
+      <h2>インシデント詳細: <span id="detailTrackId" class="track-id-highlight"></span></h2>
+      <button id="closeDetail">✕ 閉じる</button>
+    </div>
+    <div class="log-columns">
+      <div class="log-col">
+        <h3>📂 Client Log</h3>
+        <pre id="clientLogContent"></pre>
+      </div>
+      <div class="log-col">
+        <h3>🖥️ Server Log (SSH)</h3>
+        <pre id="serverLogContent"></pre>
+      </div>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

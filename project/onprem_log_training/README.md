@@ -7,128 +7,174 @@
 自分でログ収集ツールを作ってみる練習環境**です。そのため、SSHログ収集ツール本体
 (`log_collector/log-collector-skill`)は含みません — 受講者が自作する対象です。
 
-## 構成
+---
 
-- **`client/`** — アプリケーションサーバ役。RoboMart(架空のロボット販売ECサイト)のWeb/API層。
-  ローカルの `node` プロセスとして動作し、`client/logs/app.log` にリクエストログを記録します。
-- **`server/`** — 機能(業務ロジック)サーバ役。在庫・注文計算などの業務ロジックを提供するAPI。
-  Dockerコンテナとして動作し、SSH経由でログ(`server/logs/service.log`)にアクセスできます
-  (収集練習の対象)。
-- `client` → `server` へのHTTP呼び出しには `X-Track-Id` ヘッダでTrackIDを伝播させ、
-  両方のログに同一TrackIDが残るようにしています。これにより「別サーバーのログをTrackIDで
-  紐づけて収集する」という研修テーマを体験できます。
+## 研修の目的
 
-## クイックスタート(Docker、推奨)
+実際の業務システムでは、複数のサーバーがそれぞれ独立にログを出力しており、
+障害発生時に「どのサーバーの、どの時刻の、どのログが同じ処理に関するものか」を
+特定するのが困難です。この研修環境では、その状況を小規模・安全に再現し、
+**AIエージェントを使ってログ収集・分析ツールを自作する体験**を提供します。
 
-`client` と `server` を1つの docker-compose で同時に起動します。
+---
+
+## 全体構成
+
+```
+onprem_log_training/
+├── client/          # アプリケーションサーバ役（RoboMart Web/API層）
+│   └── logs/
+│       └── app.log  # clientログ（ホストへbind mount、SSH不要で直接読める）
+├── server/          # 機能サーバ役（在庫・注文の業務ロジック）
+│   └── (コンテナ内) /app/logs/service.log  # SSH経由でのみアクセス可
+├── log-viewer/      # ログ可視化ダッシュボード（研修完成物サンプル）
+├── docker/          # docker-compose.yml / Dockerfile
+├── docs/            # 研修資料（Markdown + インフォグラフ）
+├── scripts/         # npm install / docker build / pull ヘルパー
+├── AGENT_SSH_GUIDE.md  # AIエージェント向けSSH接続情報
+└── README.md        # このファイル
+```
+
+### サービス構成
+
+| 役割 | コンテナ名 | 公開ポート | ログの場所 |
+|---|---|---|---|
+| **client**（アプリ層） | `onprem-log-training-client` | `:3002` | `client/logs/app.log`（ホストbind mount） |
+| **server**（業務ロジック層） | `onprem-log-training-server` | `:4002`（HTTP）/ `:5101`（SSH） | コンテナ内 `/app/logs/service.log` |
+| **log-viewer**（ダッシュボード） | `onprem-log-viewer` | `${LOG_VIEWER_PORT:-8090}`（デフォルト`:8090`） | — |
+
+---
+
+## TrackIDによるログ相関
+
+1つのユーザー操作が発生すると、`client` は7文字のランダムな識別子（**TrackID**）を発行します。
+この TrackID は `client` → `server` へのHTTPヘッダ（`X-Track-Id`）で伝播し、
+**両方のログに同じ TrackID が残ります**。
+
+```
+ブラウザ操作
+   │
+   ▼
+client  (TrackID: ABC1234 を発行)
+   │  X-Track-Id: ABC1234 を付けて問い合わせ
+   ▼
+server  (受け取った ABC1234 を自分のログにも記録)
+```
+
+| ログファイル | 場所 | アクセス方法 |
+|---|---|---|
+| `client/logs/app.log` | ホストにbind mount | 直接ファイル読み込み |
+| `/app/logs/service.log` | コンテナ内 | SSH経由（ポート`:5101`） |
+
+**この「同じ TrackID が複数ログに分散する」状態を解決することが研修の核心です。**
+
+---
+
+## 意図的に仕込まれたバグ
+
+研修体験のため、`server` 側に2つのバグが仕込まれています（`server/bug-config.json` で有効/無効切替可）。
+
+| 操作 | エラー内容 | バグID |
+|---|---|---|
+| WalkyDog Mk2の詳細ページを開く | `TypeError: Cannot read properties of undefined (reading 'map')` | `PRODUCT_STOCK_ZERO_NPE` |
+| 請求書払いで注文確定 | `Invoice payment method not supported` | `ORDER_TOTAL_UNDEFINED_TAX` |
+
+どちらもブラウザ操作でエラーを発生させ、TrackIDを使って2つのログを突き合わせる体験ができます。
+
+---
+
+## クイックスタート（Docker、推奨）
 
 ```bash
 cp .env.example .env
+# 必要に応じて .env の LOG_VIEWER_PORT を環境のSG/ファイアウォールで開放済みのポートに変更する
 cd docker
-./setup-containers.sh start
-# または: cd docker && docker compose up -d --build
+docker-compose up -d --build
 ```
 
-ブラウザで `http://localhost:3002/` を開きます(ポートは `.env` の `CLIENT_HTTP_PORT` で変更可)。
+ブラウザで以下のURLにアクセスします（`<外部ドメイン>` は環境に応じて読み替えてください）。
 
-- 在庫切れ商品「WalkyDog Mk2」の詳細ページを開く → 500エラー(`PRODUCT_STOCK_ZERO_NPE`)
-- カートに商品を追加し、決済方法「請求書払い」で注文確定 → 500エラー(`ORDER_TOTAL_UNDEFINED_TAX`)
+| サービス | URL |
+|---|---|
+| RoboMart ECサイト | `http://<外部ドメイン>:3002/` |
+| Log Viewer ダッシュボード | `http://<外部ドメイン>:<LOG_VIEWER_PORT>/` |
 
-いずれのエラーもレスポンスに `track_id` が含まれ、`client/logs/app.log`(ホストへbind mount済み、
-SSH不要で直接読めます)と `server/logs/service.log`(コンテナ内、SSH経由でアクセス)の両方に
-同じTrackIDでログが残ります。`server` へのSSH接続情報は [AGENT_SSH_GUIDE.md](AGENT_SSH_GUIDE.md)
-にまとめています。学習者はこのファイルをAIエージェントに読ませるだけで、SSH接続の詳細を
-意識せずに使えます。
-
-バグは `server/bug-config.json` の `enabled` を `false` にすると個別に無効化できます。
-
-コンテナの停止/削除:
+停止・削除:
 
 ```bash
-./setup-containers.sh stop
-./setup-containers.sh clean
+docker-compose stop
+docker-compose down
 ```
 
-## クイックスタート(ローカル、Dockerなし)
+---
 
-Dockerを使わずに動作確認したい場合は、次の手順でも起動できます。
+## クイックスタート（ローカル、Dockerなし）
 
 ```bash
-# server (機能サーバ) を起動
-cd server
-npm install
-PORT=4002 node server.js
+# server（機能サーバ）を起動
+cd server && npm install
+PORT=4002 node server.js &
 
-# 別ターミナルで client (アプリケーションサーバ) を起動
-cd client
-npm install
-PORT=3002 SERVER_BASE_URL=http://localhost:4002 node server.js
+# client（アプリ）を起動
+cd ../client && npm install
+PORT=3002 SERVER_BASE_URL=http://localhost:4002 node server.js &
+
+# log-viewerを起動
+cd ../log-viewer
+node server.js
 ```
 
-ブラウザで `http://localhost:3002/` を開きます。挙動は上記Docker版と同じです。
+`client/logs/app.log` はホストに直接書き込まれるため、log-viewer はコンテナなしでも実ログを読めます。
 
-## プロキシ切替(オンプレ環境向け)
+---
+
+## 研修の流れ
+
+受講者はAIエージェント（Claude Codeなど）に指示を出しながら、以下を自作します。
+
+1. **エラー検知** — `client/logs/app.log` を監視し、ERROR行を検出する
+2. **TrackID抽出** — 検出行から `TrackID:[A-Z0-9]{7}` を取り出す
+3. **SSH収集** — `AGENT_SSH_GUIDE.md` を参考に、server側ログを SSH経由で検索する
+4. **ログ紐づけ** — 2つのログを TrackID でまとめ、1インシデントとして表示する
+
+SSH接続情報（ホスト・ポート・鍵・ログパス）は [AGENT_SSH_GUIDE.md](AGENT_SSH_GUIDE.md) にまとめています。
+AIエージェントにこのファイルを読ませるだけで、受講者がSSH詳細を覚える必要はありません。
+
+---
+
+## 研修完成物サンプル
+
+`log-viewer/` には、上記ログ収集ツールの**完成物サンプル**としてダッシュボードが実装されています。
+詳細は [log-viewer/README.md](log-viewer/README.md) を参照してください。
+
+---
+
+## プロキシ設定（オンプレ環境向け）
 
 `.env` の `USE_PROXY` で切替可能です。
 
 ```bash
 cp .env.example .env
-# USE_PROXY=true にしてHTTP_PROXY/HTTPS_PROXY/NO_PROXYを設定
+# USE_PROXY=true にして HTTP_PROXY / HTTPS_PROXY / NO_PROXY を設定
 ```
 
-- `scripts/npm-install.sh` — プロキシ設定を反映して `client`/`server` の `npm install` を実行します。
-- `scripts/docker-build.sh` — プロキシ設定を `--build-arg` として渡し、`server` イメージをビルドします。
-- `scripts/docker-pull.sh` — ビルド済みイメージを `docker pull` するだけの手順です(下記参照)。
+| スクリプト | 用途 |
+|---|---|
+| `scripts/npm-install.sh` | プロキシ設定を反映して client/server の `npm install` を実行 |
+| `scripts/docker-build.sh` | プロキシを `--build-arg` で渡して server イメージをビルド |
+| `scripts/docker-pull.sh` | ビルド済みイメージを `docker pull` するだけの手順 |
 
-### プロキシが関わる3つの場面と対応状況
+> **補足（ホワイトリスト環境）:** `apk add` は Alpine独自ミラーにアクセスするため、
+> docker.io / npm のみ許可された環境ではビルドできません。
+> ホワイトリスト制限のない環境でイメージをビルド → Docker Hub に push → オンプレ側は `docker pull` のみ、
+> という運用を推奨します（詳細は `scripts/docker-pull.sh` 内コメント参照）。
 
-コンテナ関連の通信は「ビルド時」「pull時(コンテナ作成時)」「実行時(コンテナ内プロセス)」の
-3つに分かれ、それぞれ効くレイヤーが異なります。
-
-| 場面 | プロキシの効くレイヤー | 本プロジェクトの対応 |
-|---|---|---|
-| ①`docker build`中の`apk add`/`npm install` | Dockerfile内の`RUN`が使うシェル環境変数 | `docker/Dockerfile`で`ARG HTTP_PROXY/HTTPS_PROXY/NO_PROXY`を宣言し、`docker-compose.yml`の`build.args`から渡す。**完成イメージには焼き込まない**(ビルド環境と実行環境のプロキシ設定が違っても影響しないようにするため) |
-| ②`docker pull`(コンテナ作成時) | Dockerデーモン自体の設定 | シェルの環境変数では効かない。ホスト側で一度だけ`/etc/systemd/system/docker.service.d/http-proxy.conf`を設定する(下記参照、本プロジェクトのスクリプトの範囲外) |
-| ③コンテナ実行時(`node server.js`プロセス) | コンテナに渡された環境変数 | `docker-compose.yml`の`environment:`で`HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`をコンテナに渡す。現状の`server`は外部通信をしないため実害はないが、将来学習者がコードを拡張して外部通信を追加した場合にも自動的にプロキシが効く |
-
-いずれも `.env` の `USE_PROXY` 一つで切替可能です(`scripts/proxy-env.sh`が`USE_PROXY=false`のとき
-これらの変数を空にするため、①③は自動的にプロキシなしになります)。
-
-### ホワイトリスト(docker.io / npm のみ)への対応
-
-このオンプレ環境のネットワークホワイトリストは `docker.io` と `npm` のみです。
-一方、既存のDocker構築パターンが使う `apk add openssh-server` はAlpine独自の
-パッケージミラー(`dl-cdn.alpinelinux.org`)にアクセスするため、**プロキシを経由しても
-ホワイトリストの対象外**になります。これはプロキシ設定では解決できません。
-
-そのため、次の運用を前提とします:
-
-1. `server` のDockerイメージは、ホワイトリスト制約のない環境で `scripts/docker-build.sh` を使って
-   一度だけビルドする(ベースイメージは `docker.io/library/node:18-alpine` をフルパスで指定済み、
-   Docker公式イメージ)。
-2. ビルドしたイメージに `docker.io/your-dockerhub-username/onprem-log-training-server:latest`
-   のようなフルパスのタグを付け、`docker push` でdocker.io(Docker Hub)へ公開する。
-3. `.env` の `DOCKER_IMAGE` に、公開した上記フルパスを設定する。
-4. オンプレ環境側では `scripts/docker-pull.sh` で `docker pull` するだけとし、
-   `docker build`/`apk add` は一切実行しない。`DOCKER_IMAGE` を常にdocker.ioのフルパスで
-   指定することで、コンテナ作成時に他のレジストリと解決を迷う余地をなくしている(上表②)。
-
-`docker pull` 自体のプロキシは、シェルの環境変数ではなくDockerデーモン側の設定
-(`/etc/systemd/system/docker.service.d/http-proxy.conf`)で決まります。これはホスト側で
-一度だけ行う設定であり、本プロジェクトのスクリプトの範囲外です(詳細は
-`scripts/docker-pull.sh`内のコメントを参照)。
+---
 
 ## 学習者向け解説資料
 
-インフォグラフ(一枚絵)作成の元原稿として、以下のドキュメントを用意しています。
-
 | ドキュメント | 内容 |
 |---|---|
-| [docs/01_environment_overview.md](docs/01_environment_overview.md) | この環境の全体構成、client/server分離とTrackIDによるログ相関の説明 |
+| [docs/01_environment_overview.md](docs/01_environment_overview.md) | 環境全体構成・TrackIDによるログ相関の説明 |
 | [docs/02_building_log_collector_with_ai.md](docs/02_building_log_collector_with_ai.md) | AIエージェントでログ収集ツールを作る際のポイントとプロンプト例 |
 | [docs/03_container_basics.md](docs/03_container_basics.md) | コンテナ(Docker)の説明と仮想マシンとの違い |
-
-## 変更していないもの
-
-このプロジェクトは `projects/log_collector/` 配下のいずれのファイルも変更していません
-(`demo-app`, `dev-environment`, `auto-repair-demo`, `log-collector-skill` はすべて既存のまま)。

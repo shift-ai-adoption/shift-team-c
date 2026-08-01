@@ -1,0 +1,14 @@
+{
+  "name": "log-viewer",
+  "version": "2.0.0",
+  "description": "ログ可視化ダッシュボード — onprem_log_training",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ssh2": "^1.15.0"
+  }
+}

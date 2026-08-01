@@ -29,6 +29,7 @@ services:
       - HTTP_PROXY=${HTTP_PROXY:-}
       - HTTPS_PROXY=${HTTPS_PROXY:-}
       - NO_PROXY=${NO_PROXY:-}
+      - TZ=Asia/Tokyo
     volumes:
       - ../client/logs:/app/logs
     depends_on:
@@ -65,11 +66,41 @@ services:
       - HTTP_PROXY=${HTTP_PROXY:-}
       - HTTPS_PROXY=${HTTPS_PROXY:-}
       - NO_PROXY=${NO_PROXY:-}
+      - TZ=Asia/Tokyo
     restart: unless-stopped
     networks:
       - onprem-log-training-network
     healthcheck:
       test: ["CMD", "pgrep", "sshd"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  log-viewer:
+    build:
+      context: ../log-viewer
+      dockerfile: Dockerfile
+    container_name: onprem-log-viewer
+    ports:
+      - "${LOG_VIEWER_PORT:-8090}:8090"
+    volumes:
+      - ../client/logs:/app/client-logs:ro
+      - ../docker/sample-data:/app/ssh-keys:ro
+    environment:
+      - PORT=8090
+      - CLIENT_LOG_PATH=/app/client-logs/app.log
+      - SSH_KEY_PATH=/app/ssh-keys/training_key
+      - SSH_HOST=training-server
+      - SSH_PORT=22
+      - TZ=Asia/Tokyo
+    networks:
+      - onprem-log-training-network
+    depends_on:
+      training-server:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
       interval: 30s
       timeout: 10s
       retries: 3

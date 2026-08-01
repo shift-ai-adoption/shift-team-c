@@ -21,7 +21,7 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
 
-RUN apk add --no-cache bash openssh-server sudo
+RUN apk add --no-cache bash openssh-server sudo tzdata
 
 RUN addgroup -g 2000 trainee && \
     adduser -D -u 2000 -G trainee trainee

@@ -7,6 +7,10 @@ ARG HTTP_PROXY
 ARG HTTPS_PROXY
 ARG NO_PROXY
 
+# tzdata: タイムゾーン(JST)対応
+# su-exec: rootでパーミッション修正後にnodeユーザーへ切り替えるために使用
+RUN apk add --no-cache tzdata su-exec
+
 WORKDIR /app
 
 COPY client/package.json ./
@@ -16,13 +20,15 @@ COPY client/ ./
 
 RUN mkdir -p /app/logs && chown -R node:node /app
 
+COPY docker/startup-client.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
+
 ENV NODE_ENV=production \
     PORT=3002
 
 EXPOSE 3002
 
-USER node
-
-CMD ["node", "server.js"]
+# rootで起動し、startup.shがパーミッション修正後にsu-execでnodeへ切り替える
+CMD ["/usr/local/bin/startup.sh"]
 
 LABEL description="onprem_log_training - client tier (application server, no SSH, logs bind-mounted from host)"

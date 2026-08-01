@@ -12,7 +12,11 @@ function genTrackId() {
 }
 
 function iso(now) {
-  return new Date(now).toISOString();
+  // toISOString() は常にUTCを返すため、JST(+09:00)に変換して出力する
+  const d = new Date(now);
+  const offset = 9 * 60; // JST = UTC+9
+  const local = new Date(d.getTime() + offset * 60 * 1000);
+  return local.toISOString().replace('Z', '+09:00');
 }
 
 function writeLine(level, trackId, req, extra) {
