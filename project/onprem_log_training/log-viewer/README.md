@@ -30,14 +30,30 @@
 > ご自身の環境では `.env` の `PORT`（RoboMart）と `LOG_VIEWER_PORT`（Log Viewer）で変わります。
 > 確認するには `docker ps` を実行してください。
 
-> **⚠️ Log Viewer が表示されない場合**
-> Cチーム環境では log-viewer コンテナがまだ起動していない可能性があります。
-> 以下のコマンドで起動してください（初回はビルドに数分かかります）。
+> **✅ 起動状況（2026-08-02 動作確認済み）**
+> Cチーム研修環境では log-viewer コンテナは**すでに起動済み**で、上記URLからそのまま利用できます。
+> EC2を停止・再開始した場合も自動で復帰します（`restart: unless-stopped` + systemd登録済み）。
+>
+> **⚠️ もし表示されない場合**は以下で起動してください（初回はビルドに数分かかります）。
 > ```bash
 > cd project/onprem_log_training/docker
 > docker-compose up -d --build log-viewer
 > docker ps | grep log-viewer   # 8001->8090 で Up (healthy) になればOK
 > ```
+> なお `.env` は `docker/` からシンボリックリンクで参照しています。
+> ポートを変更した場合は `docker-compose up -d --force-recreate log-viewer` で作り直してください
+> （`up -d` だけではポート変更が反映されません）。
+
+### 動作確認の実測結果（2026-08-02）
+
+| 確認項目 | 結果 |
+|---|---|
+| ① RoboMart（3002） | HTTP 200 ✅ |
+| ② Log Viewer（8001） | HTTP 200 ✅ |
+| WalkyDog Mk2（`RBT-DOG-02`）で意図的エラー | **HTTP 500** ✅ 記載通り |
+| ダッシュボードへの反映 | `errorCount=2` / `pathErrorRanking` に該当パス表示 ✅ |
+| SSH経由のサーバログ収集 | `serverReachable: true` ✅ |
+| コンテナ3台 | すべて `healthy` ✅ |
 
 ---
 
