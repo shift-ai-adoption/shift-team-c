@@ -8,6 +8,39 @@
 
 ---
 
+## 🚀 まずはここにアクセス（研修者向け）
+
+研修環境を起動したら、以下の2つのURLをブラウザで開いてください。
+
+| # | 画面 | URL | 役割 |
+|---|---|---|---|
+| 1 | **RoboMart（ECサイト）** | http://hermes-team-c.shift-ai-adoption.org:3002/ | ログを発生させる側。商品を閲覧・操作するとログが出力されます |
+| 2 | **Log Viewer（ダッシュボード）** | http://hermes-team-c.shift-ai-adoption.org:8001/ | ログを可視化する側。①の操作結果がここに表示されます |
+
+### おすすめの確認手順
+
+1. **①RoboMart** を開き、商品一覧から適当な商品の詳細ページを表示する
+2. 特に **WalkyDog Mk2**（SKU: `RBT-DOG-02`）の詳細ページを開くと、意図的にエラー（HTTP 500）が発生します
+3. **②Log Viewer** を開くと、いま発生したログがインシデント一覧に表示されます
+4. インシデントの行をクリックすると、Client/Serverの両ログがTrackIDで紐づいて詳細表示されます
+5. 画面は10秒ごとに自動更新されるので、①と②を並べて開くとログの流れが体感できます
+
+> **ポート番号について**
+> 上記はCチーム研修環境（hermes-team-c）の設定です。
+> ご自身の環境では `.env` の `PORT`（RoboMart）と `LOG_VIEWER_PORT`（Log Viewer）で変わります。
+> 確認するには `docker ps` を実行してください。
+
+> **⚠️ Log Viewer が表示されない場合**
+> Cチーム環境では log-viewer コンテナがまだ起動していない可能性があります。
+> 以下のコマンドで起動してください（初回はビルドに数分かかります）。
+> ```bash
+> cd project/onprem_log_training/docker
+> docker-compose up -d --build log-viewer
+> docker ps | grep log-viewer   # 8001->8090 で Up (healthy) になればOK
+> ```
+
+---
+
 ## 概要
 
 - `client/logs/app.log`（clientログ、ローカルファイル）と  
@@ -58,7 +91,8 @@ cd ../docker
 docker-compose up -d --build
 ```
 
-ブラウザで `http://<外部ドメイン>:<LOG_VIEWER_PORT>/` を開きます。  
+ブラウザで `http://<外部ドメイン>:<LOG_VIEWER_PORT>/` を開きます。
+（Cチーム研修環境では http://hermes-team-c.shift-ai-adoption.org:8001/ ）  
 `LOG_VIEWER_PORT` は `.env` の `LOG_VIEWER_PORT` で指定してください（環境のSG/ファイアウォールで開放済みのポートに合わせること）。
 
 ### ローカル起動（Dockerなし）
