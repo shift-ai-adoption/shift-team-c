@@ -1,7 +1,7 @@
 // public/app.js
 'use strict';
 
-const POLL_INTERVAL = 10000; // 10秒ポーリング
+const DEFAULT_POLL_INTERVAL = 10000; // 初期値: 10秒ポーリング
 let incidents = [];
 
 // --- DOM refs ---
@@ -12,6 +12,7 @@ const clientLogEl    = document.getElementById('clientLogContent');
 const serverLogEl    = document.getElementById('serverLogContent');
 const errorsOnly     = document.getElementById('errorsOnly');
 const lastUpdated    = document.getElementById('lastUpdated');
+const pollIntervalEl = document.getElementById('pollInterval');
 
 // ===== サマリーカード描画 =====
 function renderSummary(s) {
@@ -111,7 +112,10 @@ document.getElementById('closeDetail').addEventListener('click', () => {
 
 // ===== フィルタ・手動更新 =====
 errorsOnly.addEventListener('change', () => renderTable(incidents));
-document.getElementById('refreshBtn').addEventListener('click', refresh);
+document.getElementById('refreshBtn').addEventListener('click', () => {
+  applyPollInterval();  // プルダウンで選んだ間隔を適用（更新ボタン押下時のみ）
+  refresh();
+});
 
 // ===== HTML エスケープ =====
 function escHtml(s) {
@@ -145,6 +149,23 @@ async function refresh() {
   }
 }
 
+// ===== ポーリング間隔の制御 =====
+// プルダウンで選ばれた間隔を実際のタイマーに反映する。
+// 「しない（停止）」(value="0") が選ばれた場合はタイマーを張らない。
+// 呼び出しは「初回」と「🔄更新ボタン押下時」のみ（プルダウン変更だけでは適用しない仕様）。
+let pollTimer = null;
+
+function applyPollInterval() {
+  if (pollTimer) {
+    clearInterval(pollTimer);   // 古いタイマーを必ず止める（二重更新の防止）
+    pollTimer = null;
+  }
+  const ms = pollIntervalEl ? parseInt(pollIntervalEl.value, 10) : DEFAULT_POLL_INTERVAL;
+  if (Number.isFinite(ms) && ms > 0) {
+    pollTimer = setInterval(refresh, ms);
+  }
+}
+
 // 初回 + 定期更新
+applyPollInterval();
 refresh();
-setInterval(refresh, POLL_INTERVAL);
