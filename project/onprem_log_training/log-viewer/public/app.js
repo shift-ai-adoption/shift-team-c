@@ -84,12 +84,16 @@ function renderTable(data) {
     ? data.filter(i => i.level === 'ERROR')
     : data;
 
-  if (!filtered.length) {
+  // キーワード検索を適用（演習⑦）。件数表示の母数は「ERRORのみ表示」適用後の件数。
+  const searched = applySearch(filtered);
+  updateSearchCount(searched.length, filtered.length);
+
+  if (!searched.length) {
     tableBody.innerHTML = '<tr><td colspan="6" class="loading">インシデントなし</td></tr>';
     return;
   }
 
-  tableBody.innerHTML = filtered.map(i => `
+  tableBody.innerHTML = searched.map(i => `
     <tr data-id="${escHtml(i.trackId)}">
       <td><code>${escHtml(i.trackId)}</code></td>
       <td><span class="badge-${(i.level || 'unknown').toLowerCase()}">${escHtml(i.level || '?')}</span></td>
@@ -129,6 +133,31 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
   applyPollInterval();  // プルダウンで選んだ間隔を適用（更新ボタン押下時のみ）
   refresh();
 });
+
+// ===== キーワード検索（演習⑦） =====
+// TrackID / パス / レベル の部分一致で絞り込む。大文字小文字は区別しない。
+// スペース区切りで複数語を入れた場合は AND 検索（全語を含む行だけ残す）。
+// 検索値は DOM の input に保持されるため、自動更新後も条件は維持される。
+const searchBox   = document.getElementById('searchBox');
+const searchCount = document.getElementById('searchCount');
+
+function applySearch(data) {
+  const terms = (searchBox.value || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return data;
+
+  return data.filter(i => {
+    const haystack = [i.trackId, i.path, i.level].map(v => String(v || '').toLowerCase());
+    return terms.every(t => haystack.some(h => h.includes(t)));
+  });
+}
+
+function updateSearchCount(shown, total) {
+  searchCount.textContent = searchBox.value.trim()
+    ? `${shown} 件 / 全 ${total} 件`
+    : `全 ${total} 件`;
+}
+
+searchBox.addEventListener('input', () => renderTable(incidents));
 
 // ===== HTML エスケープ =====
 function escHtml(s) {
