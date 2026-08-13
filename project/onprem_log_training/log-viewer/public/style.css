@@ -25,6 +25,16 @@ header h1 {
   color: #7c83f5;
   letter-spacing: 0.03em;
 }
+.title-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.live-clock {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
 .controls {
   display: flex;
   align-items: center;
