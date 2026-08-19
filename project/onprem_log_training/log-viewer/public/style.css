@@ -349,3 +349,11 @@ pre {
   color: #94a3b8;
   font-size: 13px;
 }
+
+/* ===== 詳細パネル ログ行カラーリング（演習②） ===== */
+/* 行は `\n` 区切りのまま <pre> の pre-wrap に任せるため、
+   span は inline のままにする（display:block にすると空行が入る）。*/
+.log-line-error { color: #f87171; }
+.log-line-warn  { color: #fbbf24; }
+.log-line-info  { color: #4ade80; }
+.log-line-debug { color: #94a3b8; }

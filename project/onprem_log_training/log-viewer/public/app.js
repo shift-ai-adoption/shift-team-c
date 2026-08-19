@@ -111,13 +111,42 @@ function renderTable(data) {
 }
 
 // ===== 詳細パネル =====
+
+// --- ログ行のレベル別カラーリング（演習②）---
+// ログ行の書式は `<timestamp> <LEVEL> TrackID:xxx [path] ...` なので、
+// 2番目のトークン（レベル欄）を優先して判定する。
+// 書式に合わない行は行全体からレベル語を探すフォールバックで判定する。
+// これにより `err=Error: ...` のようなメッセージ本文の語で誤判定しない。
+const LOG_LEVEL_CLASS = {
+  ERROR: 'log-line-error',
+  WARN:  'log-line-warn',
+  INFO:  'log-line-info',
+  DEBUG: 'log-line-debug',
+};
+
+function logLineClass(line) {
+  const token = String(line).trim().split(/\s+/)[1];
+  if (token && LOG_LEVEL_CLASS[token.toUpperCase()]) {
+    return LOG_LEVEL_CLASS[token.toUpperCase()];
+  }
+  const m = /\b(ERROR|WARN|INFO|DEBUG)\b/.exec(String(line));
+  return m ? LOG_LEVEL_CLASS[m[1]] : '';
+}
+
+// textContent → innerHTML に変える都合上、行本文は必ず escHtml() を通す（XSS対策）
+function colorizeLog(lines) {
+  return (lines || [])
+    .map(line => `<span class="log-line ${logLineClass(line)}">${escHtml(line)}</span>`)
+    .join('\n');
+}
+
 function showDetail(trackId) {
   const inc = incidents.find(i => i.trackId === trackId);
   if (!inc) return;
 
   detailTrackId.textContent  = trackId;
-  clientLogEl.textContent    = inc.clientLogs.join('\n') || '（データなし）';
-  serverLogEl.textContent    = inc.serverLogs.join('\n') || '（SSH未接続またはデータなし）';
+  clientLogEl.innerHTML      = colorizeLog(inc.clientLogs) || '（データなし）';
+  serverLogEl.innerHTML      = colorizeLog(inc.serverLogs) || '（SSH未接続またはデータなし）';
 
   detailPanel.classList.remove('hidden');
   detailPanel.scrollIntoView({ behavior: 'smooth' });
