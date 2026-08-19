@@ -33,6 +33,15 @@ function renderSummary(s) {
 
   document.getElementById('valTotal').textContent    = s.totalRequests;
   document.getElementById('valError').textContent    = s.errorCount;
+
+  // ⚠️ WARN件数（演習④）
+  // このissueの変更対象は statsAnalyzer.js / index.html / app.js の3ファイルのみで
+  // style.css は対象外のため、色は既存の valSSH と同じ流儀でインラインに設定する。
+  // 旧バージョンのAPI（warnCount なし）でも '—' で安全に表示する。
+  const warnEl = document.getElementById('valWarn');
+  warnEl.textContent = s.warnCount ?? '—';
+  warnEl.style.color = (s.warnCount ?? 0) > 0 ? '#fbbf24' : '#f1f5f9';
+
   document.getElementById('valRate').textContent     = s.errorRate;
   document.getElementById('valStart').textContent    = fmtTime(s.startTime);
   document.getElementById('valEnd').textContent      = fmtTime(s.endTime);
