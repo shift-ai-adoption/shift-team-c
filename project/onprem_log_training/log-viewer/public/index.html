@@ -101,7 +101,10 @@
 
   <!-- ③ インシデント一覧 -->
   <section id="incidentSection">
-    <h2>📊 インシデント一覧</h2>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h2>📊 インシデント一覧</h2>
+      <button id="csvBtn" title="表示中のインシデントをCSVとして保存します">📥 CSVダウンロード</button>
+    </div>
     <table class="incident-table">
       <thead>
         <tr>
