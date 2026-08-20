@@ -71,6 +71,9 @@ function buildSummary(incidents, serverReachable = false) {
 
   const totalRequests = incidents.length;
   const errorCount = levelCounts.ERROR;
+  // WARN件数（演習④）。errorCount と同じ「ログ行ベース」の集計に揃える。
+  // （levelCounts は上でクライアントログ全行をパースして数えている）
+  const warnCount = levelCounts.WARN;
   const errorRate = totalRequests > 0
     ? `${(errorCount / totalRequests * 100).toFixed(1)}%`
     : '0%';
@@ -78,6 +81,7 @@ function buildSummary(incidents, serverReachable = false) {
   return {
     totalRequests,
     errorCount,
+    warnCount,
     errorRate,
     startTime,
     endTime,
