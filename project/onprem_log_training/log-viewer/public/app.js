@@ -249,3 +249,65 @@ function applyPollInterval() {
 // 初回 + 定期更新
 applyPollInterval();
 refresh();
+
+// ===== CSVダウンロード（演習⑤） =====
+// 「画面に表示されているものがそのままCSVになる」ことを原則とする。
+// そのため renderTable() と同じ順序で ①ERRORのみ表示 → ②キーワード検索（演習⑦）
+// の両方を適用する。片方だけ適用すると「見えている表」とCSVの中身がずれてしまう。
+function csvTargetIncidents() {
+  const filtered = errorsOnly.checked
+    ? incidents.filter(i => i.level === 'ERROR')
+    : incidents;
+  return applySearch(filtered);
+}
+
+// RFC 4180: 値は常にダブルクォートで囲み、値中の " は "" にエスケープする。
+// 改行・カンマを含む値（ログのパス等）でも列がずれない。
+function csvEscape(v) {
+  return `"${String(v ?? '').replace(/"/g, '""')}"`;
+}
+
+function buildCsv(rowsData) {
+  const header = ['TrackID', 'Level', 'Timestamp', 'Path', 'ClientLogs行数', 'ServerLogs行数'];
+  const rows = rowsData.map(i => [
+    i.trackId,
+    i.level || '',
+    i.timestamp || '',
+    i.path || '',
+    i.clientLogs.length,
+    i.serverLogs.length,
+  ]);
+  // 改行は CRLF（RFC 4180準拠）。Excel で1行にまとまってしまう問題を避ける。
+  return [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
+}
+
+// ファイル名の日付は「ローカル日付」を使う。
+// new Date().toISOString() は UTC のため、JST では 9時前に前日の日付になってしまう。
+function localDateStamp(d = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+document.getElementById('csvBtn').addEventListener('click', () => {
+  const target = csvTargetIncidents();
+  if (!target.length) {
+    alert('ダウンロード対象のインシデントがありません。フィルタ条件を確認してください。');
+    return;
+  }
+
+  // 先頭に BOM を付ける。これがないと Excel がUTF-8と判定せず
+  // 日本語ヘッダー（例: ClientLogs行数）が文字化けする。
+  const blob = new Blob(['\uFEFF' + buildCsv(target)], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `incidents_${localDateStamp()}.csv`;
+  a.style.display = 'none';
+
+  // 一部ブラウザは DOM に無い <a> のクリックを無視するため、必ず追加してから click する。
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // ダウンロード開始前に revoke するとキャンセルされることがあるので次のタスクで解放する。
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+});
